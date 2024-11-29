@@ -1,0 +1,72 @@
+package com.example.demo.resources;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.socket.WebSocketHandler;
+
+import com.example.demo.service.MatchService;
+import com.example.demo.service.MatchmakingService;
+
+@RestController
+@RequestMapping("/api/v1/match")
+@CrossOrigin(origins = "*")
+public class MatchController {
+
+	// aqui criaremos as partidas porém precisaremos de um ticket para ter acesso
+
+	@Autowired
+	private MatchService repo;
+
+	@Autowired
+	private MatchmakingService matchmakingService;
+
+	@Autowired
+	@Qualifier("wsWebSocketHandler")
+	private WebSocketHandler sessionManager;
+//
+//	@GetMapping("/{id}")
+//	public ResponseEntity<Match> getMatch(@PathVariable UUID id) {
+//
+//		Match match = this.repo.getMatch(id);
+//		return ResponseEntity.ok().body(match);
+//	}
+//
+////	@PostMapping("/start")
+////	public ResponseEntity<String> startMatchmaking(@AuthenticationPrincipal User user) {
+////		matchmakingService.startMatchmaking(user);
+////		return ResponseEntity.ok().body("Busca por partida iniciada");
+////	}
+//
+//	@PostMapping("/find-match")
+//	public ResponseEntity<Void> findMatch(@AuthenticationPrincipal User user) {
+//		WebSocketSession session = getSessionForUser(user); // Implementar método para obter a sessão WebSocket do
+//															// usuário
+//		matchmakingService.findMatch(session);
+//		return ResponseEntity.accepted().build();
+//	}
+//
+//	@PostMapping("/cancel-search")
+//	public ResponseEntity<Void> cancelSearch(@AuthenticationPrincipal User user) {
+//		WebSocketSession session = getSessionForUser(user); // Implementar método para obter a sessão WebSocket do
+//															// usuário
+//		matchmakingService.cancelSearch(session);
+//		return ResponseEntity.ok().build();
+//	}
+//
+//	private WebSocketSession getSessionForUser(User user) {
+////		return matchmakingService.getSession(user);
+//		return matchmakingService.getSession(user);
+//	}
+//
+//	@PostMapping("/{id}")
+//	public ResponseEntity<Match> modifyMatchScoreboard(@PathVariable UUID id,
+//			@RequestBody RequestMatchScoreboardDTO data) {
+//
+//		Match match = this.repo.modifyMatchScoreboard(id, data);
+//		return ResponseEntity.ok().body(match);
+//	}
+
+}

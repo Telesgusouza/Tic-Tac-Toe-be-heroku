@@ -1,0 +1,150 @@
+package com.example.demo.handler;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationListener;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import com.example.demo.entity.User;
+import com.example.demo.event.MatchFoundEvent;
+
+@Component
+public class WsWebSocketHandler extends TextWebSocketHandler implements ApplicationListener<MatchFoundEvent> {
+
+//	private Map<String, WebSocketSession> sessions;
+
+	@Autowired
+	private ApplicationContext applicationContext;
+
+	private final ConcurrentHashMap<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
+
+//	public void searchForMatch(User user) {
+//	    // ... lógica de busca de match ...
+//	    
+//	    MatchFoundEvent event = new MatchFoundEvent(this, matchId, players);
+//	    applicationContext.publishEvent(event); // Certifique-se de ter acesso ao ApplicationContext
+//	}
+
+	@Override
+	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+		System.out.println("WebSocket connection established: " + session.getId());
+		sessions.put(session.getId(), session);
+
+		session.sendMessage(new TextMessage("connected"));
+
+		// Mantenha a conexão aberta por mais tempo
+		new Thread(() -> {
+			try {
+				while (session.isOpen()) {
+					Thread.sleep(10000); // Verifique a cada 10 segundos
+					session.sendMessage(new TextMessage("keep-alive"));
+				}
+			} catch (Exception e) {
+				System.err.println("Erro ao manter conexão WebSocket: " + e.getMessage());
+			}
+		}).start();
+	}
+
+	@Override
+	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+		System.out.println("WebSocket connection closed: " + session.getId());
+		sessions.remove(session.getId());
+	}
+
+	@Override
+	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
+		System.out.println("Received message: " + message);
+		// Processar a mensagem aqui
+	}
+
+	@Override
+	public void onApplicationEvent(MatchFoundEvent event) {
+		UUID matchId = event.getMatchId();
+		List<User> players = event.getPlayers();
+
+		for (User player : players) {
+			String playerId = player.getId().toString();
+
+			WebSocketSession session = sessions.get(playerId);
+
+			System.out.println("===================================");
+			System.out.println("session => " + session);
+			System.out.println("event => " + event);
+
+			if (session != null && session.isOpen()) {
+				try {
+					String payload = "match_found:" + matchId.toString() + ":" + playerId;
+					session.sendMessage(new TextMessage(payload));
+
+					System.out.println("Mensagem enviada com sucesso para o jogador: " + player.getLogin());
+				} catch (IOException e) {
+					System.err.println(
+							"Erro ao enviar mensagem para o jogador " + player.getLogin() + ": " + e.getMessage());
+				}
+			} else {
+				System.out.println("Sessão não encontrada ou fechada para o jogador: " + player.getLogin());
+
+				// Tente novamente após um pequeno delay
+				new Thread(() -> {
+					try {
+						Thread.sleep(5000); // Espere 5 segundos
+						WebSocketSession delayedSession = sessions.get(playerId);
+						if (delayedSession != null && delayedSession.isOpen()) {
+							String payload = "match_found:" + matchId.toString() + ":" + playerId;
+							delayedSession.sendMessage(new TextMessage(payload));
+							System.out.println(
+									"Mensagem enviada com sucesso após retry para o jogador: " + player.getLogin());
+						}
+					} catch (Exception e) {
+						System.err.println("Erro ao enviar mensagem após retry: " + e.getMessage());
+					}
+				}).start();
+			}
+		}
+	}
+
+//
+//	@Override
+//	public void onApplicationEvent(MatchFoundEvent event) {
+//		UUID matchId = event.getMatchId();
+//		List<User> players = event.getPlayers();
+//
+//		for (User player : players) {
+//			String playerId = player.getId().toString();
+//
+//			WebSocketSession session = sessions.get(playerId);
+//
+//			System.out.println("===================================");
+//			System.out.println("session => " + session);
+//			System.out.println("event => " + event);
+//
+//			if (session != null && session.isOpen()) {
+//				try {
+//					String payload = "match_found:" + matchId.toString() + ":" + playerId;
+//					session.sendMessage(new TextMessage(payload));
+//
+//					System.out.println("Mensagem enviada com sucesso para o jogador: " + player.getLogin());
+//				} catch (IOException e) {
+//					System.err.println(
+//							"Erro ao enviar mensagem para o jogador " + player.getLogin() + ": " + e.getMessage());
+//				}
+//			} else {
+//				System.out.println("Sessão não encontrada ou fechada para o jogador: " + player.getLogin());
+//			}
+//		}
+//	}
+
+	private WebSocketSession getWebSocketSession(User user) {
+		return sessions.get(user.getId().toString());
+	}
+}

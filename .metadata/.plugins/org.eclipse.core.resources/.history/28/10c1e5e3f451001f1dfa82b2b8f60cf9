@@ -1,0 +1,211 @@
+package com.example.demo.handler;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.springframework.web.util.UriComponents;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.example.demo.dto.RequestBoardDTO;
+import com.example.demo.entity.Board;
+import com.example.demo.entity.Match;
+import com.example.demo.entity.User;
+import com.example.demo.enums.Player;
+import com.example.demo.service.AuthorizationService;
+import com.example.demo.service.MatchService;
+import com.example.demo.service.TicketsService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@Component
+public class WebSocketHandler extends TextWebSocketHandler {
+
+	private final TicketsService ticketsService;
+
+	private Map<String, WebSocketSession> sessions;
+
+	private Board board = new Board(null, List.of(Player.NO_PLAYER, Player.NO_PLAYER, Player.NO_PLAYER),
+			List.of(Player.NO_PLAYER, Player.NO_PLAYER, Player.NO_PLAYER),
+			List.of(Player.NO_PLAYER, Player.NO_PLAYER, Player.NO_PLAYER));
+
+	@Autowired
+	private MatchService matchRepo;
+
+	@Autowired
+	private AuthorizationService userRepo;
+
+	private User playerOne = null;
+	private User playerTwo = null;
+
+	private Player currentPlayer = Player.PLAYER_ONE;
+
+	public WebSocketHandler(TicketsService ticketsService) {
+		this.ticketsService = ticketsService;
+		sessions = new ConcurrentHashMap<>();
+	}
+
+	@Override
+	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+
+		System.out.println("[afterConnectionEstablished] session id " + session.getId());
+
+		Optional<String> ticket = ticketOf(session);
+
+		if (ticket.isEmpty() || ticket.get().isBlank()) {
+			close(session, CloseStatus.POLICY_VIOLATION);
+			return;
+		}
+
+		Optional<String> matchId = ticketsService.getMatchByTicket(ticket.get());
+
+		if (matchId.isEmpty()) {
+			close(session, CloseStatus.POLICY_VIOLATION);
+			return;
+		}
+
+		Optional<String> uriServer = Optional.ofNullable(session.getUri()).map(UriComponentsBuilder::fromUri)
+				.map(UriComponentsBuilder::build).map(UriComponents::getQueryParams).map(it -> it.get("server"))
+				.flatMap(it -> it.stream().findFirst()).map(String::trim);
+
+		sessions.put(uriServer.toString(), session);
+
+	}
+
+	@SuppressWarnings("static-access")
+	@Override
+	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
+		String payload = (String) message.getPayload();
+
+//		if (playerOne == null || playerTwo == null) {
+//			bringPlayer(session);
+//		}
+
+		if ("pong".equals(payload)) {
+
+			ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+			Runnable task = () -> {
+				try {
+					session.sendMessage(new TextMessage("ping"));
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			};
+
+			executorService.schedule(task, 4, TimeUnit.SECONDS);
+
+			// Fechar o executorService após a execução da tarefa
+			executorService.shutdown();
+		} else {
+
+			ObjectMapper mapper = new ObjectMapper();
+			RequestBoardDTO movement = mapper.readValue(payload, RequestBoardDTO.class);
+
+			if (currentPlayer != movement.player()) {
+				System.out.println("não é sua vez de jogar");
+				throw new RuntimeException("It's not this player's turn");
+			}
+
+			currentPlayer = switchPlayer(currentPlayer);
+
+			switch (movement.row()) {
+			case 1: {
+
+//				if (board.getRows_1().get(movement.column()) != Player.NO_PLAYER) {
+//					System.out.println("campo ja preenchido");
+//					throw new RuntimeException("field already filled");
+//				}
+
+				System.out.println("==========================");
+				System.out.println(movement.column());
+				System.out.println(movement.player());
+				System.out.println(currentPlayer);
+
+				// if (player) { // // }
+
+//				board.setRows_1(movement.column());
+
+				break;
+			}
+			default:
+//				throw new IllegalArgumentException("Unexpected value: " + movement.row());
+			}
+
+		}
+
+	}
+
+	private Player switchPlayer(Player currentPlayer) {
+		return currentPlayer == Player.PLAYER_ONE ? Player.PLAYER_TWO : Player.PLAYER_ONE;
+	}
+
+	@Override
+	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+
+		System.out.println("[afterConnectionClosed] session id " + session.getId());
+
+		session.close();
+
+	}
+
+	private void close(WebSocketSession session, CloseStatus status) {
+		try {
+			session.close(status);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	private Optional<String> ticketOf(WebSocketSession session) {
+
+		return Optional.ofNullable(session.getUri()).map(UriComponentsBuilder::fromUri).map(UriComponentsBuilder::build)
+				.map(UriComponents::getQueryParams).map(it -> it.get("ticket")).flatMap(it -> it.stream().findFirst())
+				.map(String::trim);
+
+	}
+
+	private Optional<String> matchOf(WebSocketSession session) {
+		return Optional.ofNullable(session.getUri()).map(UriComponentsBuilder::fromUri).map(UriComponentsBuilder::build)
+				.map(UriComponents::getQueryParams).map(it -> it.get("server")).flatMap(it -> it.stream().findFirst())
+				.map(String::trim);
+	}
+
+	private void bringPlayer(WebSocketSession session) {
+
+		Optional<String> uriMatch = matchOf(session);
+
+		if (!uriMatch.isPresent()) {
+			throw new RuntimeException("match not found");
+		}
+
+		String matchIdString = uriMatch.get();
+
+		UUID matchId;
+		try {
+			matchId = UUID.fromString(matchIdString);
+		} catch (IllegalArgumentException e) {
+			throw new RuntimeException("Invalid UUID format", e);
+		}
+
+		Match match = matchRepo.findById(matchId);
+
+		playerOne = userRepo.findById(match.getIdPlayerOne());
+		playerTwo = userRepo.findById(match.getIdPlayerTwo());
+
+	}
+
+}

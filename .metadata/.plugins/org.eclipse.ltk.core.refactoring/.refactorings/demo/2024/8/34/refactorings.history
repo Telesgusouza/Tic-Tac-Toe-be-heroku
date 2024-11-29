@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring accessors="true" comment="Delete 3 elements from project &apos;demo&apos;&#x0A;- Original project: &apos;demo&apos;&#x0A;- Original elements:&#x0A;     20562969.png&#x0A;     5186.jpg&#x0A;     sol3d.jpg" description="Delete elements" element1="20562969.png" element2="5186.jpg" element3="sol3d.jpg" elements="0" flags="589830" id="org.eclipse.jdt.ui.delete" resources="3" stamp="1724195510378" subPackages="false" version="1.0"/>
+</session>

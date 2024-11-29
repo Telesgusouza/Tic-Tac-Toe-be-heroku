@@ -1,0 +1,130 @@
+package com.example.demo.handler;
+
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+import com.example.demo.component.WebSocketSessionManager;
+import com.example.demo.service.MatchmakingService;
+
+@Component
+public class WsWebSocketHandler extends TextWebSocketHandler {
+
+
+	@Override
+	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+		System.out.println("[afterConnectionEstablished] session id " + session.getId());
+	}
+
+	@Override
+	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
+
+		System.out.println("[handleMessage] session id " + message.getPayload());
+
+		String payload = (String) message.getPayload();
+
+		if ("pong".equals(payload)) {
+			ScheduledExecutorService executorService = Executors
+					.newSingleThreadScheduledExecutor();
+
+			Runnable task = () -> {
+				try {
+					session.sendMessage(new TextMessage("ping"));
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			};
+
+
+			executorService.schedule(task, 4, TimeUnit.SECONDS);
+
+			// Fechar o executorService após a execução da tarefa
+			executorService.shutdown();
+
+			System.out.println("Enviado pong em resposta ao ping");
+		}
+	}
+
+	@Override
+	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+
+		System.out.println("[afterConnectionClosed] session id " + session.getId());
+
+		session.close();
+	}
+	
+	/*
+	private final MatchmakingService matchmakingService;
+
+	private Map<String, WebSocketSession> sessions;
+
+	@Autowired
+	private WebSocketSessionManager webSocketSessionManager;
+
+	@Autowired
+	public WsWebSocketHandler(MatchmakingService matchmakingService) {
+		this.matchmakingService = matchmakingService;
+		this.sessions = new HashMap<>(); // Inicializar o mapa aqui
+	}
+
+	@Override
+	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+		System.out.println("[afterConnectionEstablished] session id " + session.getId());
+		System.out.println("============== after connection ============");
+		System.out.println(session);
+
+		String userId = getUserIdFromSession(session);
+
+//		sessions.put("", session);
+		sessions.put(session.getId(), session);
+		webSocketSessionManager.addSession(userId, session);
+	}
+
+	@Override
+	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+		super.afterConnectionClosed(session, status);
+		System.out.println("after connection closed");
+
+		String userId = getUserIdFromSession(session); // Implemente este método para extrair o ID do usuário da sessão
+		webSocketSessionManager.removeSession(userId);
+
+		matchmakingService.removeUserFromQueue(session);
+	}
+
+	@Override
+	protected void handleTextMessage(WebSocketSession session, TextMessage textMessage) throws Exception {
+		String message = textMessage.getPayload();
+		System.out.println("Received message: " + message);
+
+		if (message.equals("find_match")) {
+			System.out.println("Attempting to find match...");
+			matchmakingService.findMatch(session);
+		} else if (message.equals("cancel_search")) {
+			System.out.println("Canceling search...");
+			matchmakingService.cancelSearch(session);
+		}
+	}
+
+	// Implemente este método para extrair o ID do usuário da sessão
+	private String getUserIdFromSession(WebSocketSession session) {
+		// Lógica para obter o ID do usuário da sessão
+		// Por exemplo, se você estiver usando Spring Security, pode ser algo como:
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		return authentication.getName(); // ou qualquer outra forma de obter o ID do usuário
+	}
+	*/
+
+}

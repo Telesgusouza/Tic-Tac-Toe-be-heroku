@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename type &apos;com.example.demo.entity.Friends&apos; to &apos;Friend&apos;&#x0A;- Original project: &apos;demo&apos;&#x0A;- Original element: &apos;com.example.demo.entity.Friends&apos;&#x0A;- Renamed element: &apos;com.example.demo.entity.Friend&apos;&#x0A;- Update references to refactored element&#x0A;- Update textual occurrences in comments and strings" description="Rename type &apos;Friends&apos;" flags="589830" id="org.eclipse.jdt.ui.rename.type" input="/src\/main\/java=/optional=/true=/=/maven.pomderived=/true=/&lt;com.example.demo.entity{Friends.java[Friends" matchStrategy="1" name="Friend" qualified="false" references="true" similarDeclarations="false" stamp="1725816072050" textual="false" version="1.0"/>
+</session>

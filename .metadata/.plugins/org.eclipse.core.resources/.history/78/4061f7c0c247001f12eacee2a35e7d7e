@@ -1,0 +1,135 @@
+package com.example.demo.handler;
+
+import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
+import org.springframework.web.socket.PongMessage;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketMessage;
+import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.handler.TextWebSocketHandler;
+
+@Component
+public class WebSocketHandler extends TextWebSocketHandler {
+
+	/*
+	 * 
+	 * deu certo, então tentei usar o método handlePongMessage, porém agora não esta
+	 * mas enviando o ping e nem o servidor esta enviando o pong
+	 * 
+	 * @Override protected void handlePongMessage(WebSocketSession session,
+	 * PongMessage message) throws Exception {
+	 * 
+	 * System.out.println("[handlePongMessage] session id " + session.getId());
+	 * System.out.println(message);
+	 * 
+	 * new Timer().scheduleAtFixedRate(new TimerTask() {
+	 * 
+	 * @Override public void run() {
+	 * 
+	 * try { session.sendMessage(new TextMessage("pong")); } catch (IOException e) {
+	 * e.printStackTrace(); }
+	 * 
+	 * } }, 2000L, 5000L);
+	 * 
+	 * }
+	 * 
+	 * 
+	 * function conection() {
+	 * 
+	 * if(!ws) { ws = new WebSocket("ws://localhost:8080/chat"); ws.onopen =
+	 * function () { console.log("Conexão estabelecida"); ws.send("ping"); // Envia
+	 * ping assim que a conexão é aberta }; ws.onclose = function () {
+	 * console.log("Conexão encerrada") }; ws.onmessage = function(event) {
+	 * console.log('Mensagem recebida: ', event.data); if (event.data === 'pong') {
+	 * console.log('Pong recebido!'); ws.send("ping"); // Responde com outro ping
+	 * após receber um pong } }; }
+	 * 
+	 * }
+	 * 
+	 * 
+	 * 
+	 */
+	@Override
+	protected void handlePongMessage(WebSocketSession session, PongMessage message) throws Exception {
+		// TODO Auto-generated method stub
+		// super.handlePongMessage(session, message);
+		System.out.println("===============================");
+		System.out.println("[handlePongMessage] message " + message + " id " + session.getId());
+	}
+
+	@Override
+	public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+
+		System.out.println("[afterConnectionEstablished] session id " + session.getId());
+
+		// foi adicionado depois
+		// a titulo de teste criaremos um loop infinito pra mais testes
+
+		session.sendMessage(new TextMessage("ping"));
+
+//		new Timer().scheduleAtFixedRate(new TimerTask() {
+//
+//			@Override
+//			public void run() {
+//
+//				try {
+////					session.sendMessage(new TextMessage("Ola > " + UUID.randomUUID()));
+//					session.sendMessage(new TextMessage("ping"));
+//				} catch (IOException e) {
+//					e.printStackTrace();
+//				}
+//
+//			}
+//		}, 2000L, 5000L);
+
+	}
+
+	@Override
+	public void handleMessage(WebSocketSession session, WebSocketMessage<?> message) throws Exception {
+
+		System.out.println("[handleMessage] session id " + message.getPayload());
+
+		String payload = (String) message.getPayload();
+		System.out.println("Recebido: " + payload);
+
+		if ("pong".equals(payload)) {
+			ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
+			Runnable task = () -> {
+				try {
+					session.sendMessage(new TextMessage("ping"));
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			};
+
+			long delayInSeconds = 5; // Define o atraso em segundos
+
+			executorService.schedule(task, 2, TimeUnit.SECONDS);
+
+			// Fechar o executorService após a execução da tarefa
+			executorService.shutdown();
+
+//			new Timer().schedule(() -> {session.sendMessage(new TextMessage("ping"))}, 2000L,2000L);
+//			session.sendMessage(new TextMessage("ping"));
+			System.out.println("Enviado pong em resposta ao ping");
+		}
+
+	}
+
+	@Override
+	public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+
+		System.out.println("[afterConnectionClosed] session id " + session.getId());
+
+		session.close();
+
+	}
+
+}

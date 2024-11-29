@@ -1,0 +1,37 @@
+package com.example.demo.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.example.demo.entity.User;
+import com.example.demo.enums.UserRole;
+import com.example.demo.repository.BoardRepository;
+import com.example.demo.repository.MatchRepository;
+import com.example.demo.repository.UserRepository;
+
+@Service
+public class MatchService {
+
+	@Autowired
+	private BoardRepository boardRepository;
+
+	@Autowired
+	private MatchRepository matchRepository;
+
+	@Autowired
+	private UserRepository userRepository;
+
+	public User searchPlayer(User user) {
+		user.setRole(UserRole.LOOKING_FOR_MATCH);
+		User anotherPlayer = this.userRepository.findByPlayer(UserRole.LOOKING_FOR_MATCH);
+
+		if (anotherPlayer == null) {
+			throw new RuntimeException("No other player found");
+		}
+		
+//		Board newBoard = new Board
+
+		return null;
+	}
+
+}

@@ -1,0 +1,92 @@
+package com.example.demo.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureWebMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import com.example.demo.entity.Match;
+import com.example.demo.repository.MatchRepository;
+import com.example.demo.repository.UserRepository;
+
+@SpringBootTest(properties = {
+
+		"AWS_ACESSKEY=aws_acesskey", "AWS_BUCKET=aws_bucket", "AWS_SECRET=aws_secret",
+
+		"JWT_SECRET=my-secret-key-for-tests",
+
+		"aws.acesskey=${AWS_ACESSKEY}", "aws.secrety=${AWS_SECRET}", "aws.bucket=${AWS_BUCKET}",
+
+		"api.security.token.secret=${JWT_SECRET:my-secret-key}",
+
+})
+@AutoConfigureWebMvc
+@ExtendWith(MockitoExtension.class)
+public class MatchServiceTest {
+
+	@Mock
+	private UserRepository userRepository;
+
+	@Mock
+	private MatchRepository matchRepository;
+
+	@InjectMocks
+	private MatchService matchService;
+
+	@Test
+	public void bringingMatchData() {
+		Optional<Match> matchOptional = Optional.of(new Match(UUID.randomUUID(), LocalDateTime.now(), UUID.randomUUID(),
+				UUID.randomUUID(), "", "", 0, 0, 0, 0));
+		Match match = matchOptional.orElseThrow();
+
+		when(matchRepository.findById(match.getId())).thenReturn(matchOptional);
+
+		Match matchEntity = matchService.getMatch(match.getId());
+
+		assertNotNull(matchEntity);
+		assertEquals(match.getId(), matchEntity.getId());
+	}
+	
+
+	@Test
+	public void matchNotFound() {
+		Optional<Match> matchOptional = Optional.of(new Match(UUID.fromString("id_match123"), LocalDateTime.now(), UUID.randomUUID(),
+				UUID.randomUUID(), "", "", 0, 0, 0, 0));
+		Match match = matchOptional.orElseThrow();
+
+		when(matchRepository.findById(UUID.fromString("id_match122"))).thenReturn(null);
+
+		assertThrows(MatchException.class, () -> matchService.getMatch(match.getId()));
+//		assertEquals(match.getId(), matchEntity.getId());
+	}
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

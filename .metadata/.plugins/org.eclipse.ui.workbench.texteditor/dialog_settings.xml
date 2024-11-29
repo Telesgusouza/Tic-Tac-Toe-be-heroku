@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
+		<item key="selection" value="authenticationManager"/>
+		<item key="wrap" value="true"/>
+		<item key="casesensitive" value="false"/>
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<list key="findhistory">
+			<item value="authenticationManager"/>
+			<item value="assertequa"/>
+			<item value="any"/>
+			<item value="AccountException"/>
+			<item value="MatchException"/>
+			<item value="FileException"/>
+			<item value="InvalidTokenException"/>
+			<item value="save"/>
+			<item value="@ApiResponse"/>
+			<item value="if"/>
+			<item value="authenticate"/>
+			<item value="handleAuthenticationException"/>
+			<item value="usuario"/>
+			<item value="authorizationService"/>
+			<item value="+"/>
+		</list>
+		<list key="replacehistory">
+			<item value=""/>
+			<item value="matchService"/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="1188"/>
+		<item key="DIALOG_Y_ORIGIN" value="75"/>
+		<item key="DIALOG_WIDTH" value="335"/>
+		<item key="DIALOG_HEIGHT" value="432"/>
+		<item key="DIALOG_FONT_NAME" value="1|Ubuntu|10.0|0|GTK|1|"/>
+	</section>
+</section>

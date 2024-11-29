@@ -1,0 +1,211 @@
+package com.example.demo.service;
+
+import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
+
+import com.example.demo.dto.RequestMatchScoreboardDTO;
+import com.example.demo.entity.Board;
+import com.example.demo.entity.Match;
+import com.example.demo.entity.User;
+import com.example.demo.enums.MatchScoreboardEnum;
+import com.example.demo.enums.Player;
+import com.example.demo.enums.UserRole;
+import com.example.demo.handler.WebSocketHandler;
+import com.example.demo.repository.BoardRepository;
+import com.example.demo.repository.MatchRepository;
+import com.example.demo.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+@Service
+public class MatchService {
+
+	@Autowired
+	private UserRepository userRepository;
+
+	@Autowired
+	private BoardRepository boardRepository;
+
+	@Autowired
+	private MatchRepository matchRepository;
+
+	@Autowired
+	private S3Service s3Service;
+
+	///////
+
+	@Autowired
+	private WebSocketHandler webSocketHandler;
+
+	///////
+
+//	public User searchPlayer(UUID idUser) {
+//		return this.userRepository.findByRoleAndIdNot(UserRole.LOOKING_FOR_MATCH, idUser);
+//	}
+
+	/////////////////////////////////////////
+
+	public Match createMatch(User user) {
+		try {
+			// Verifica se o usuário já está em uma partida
+			if (user.getRole() != UserRole.OUT_OF_START) {
+				throw new IllegalStateException("User is already in a match or looking for one");
+			}
+
+			// Marca o usuário como procurando por uma partida
+			user.setRole(UserRole.LOOKING_FOR_MATCH);
+			user.setPlayer(Player.NO_PLAYER);
+			userRepository.save(user);
+
+			// Procura por um oponente
+			User opponent = searchPlayer(user.getId());
+
+			if (opponent == null) {
+				throw new RuntimeException("No opponent found");
+			}
+
+			// Determina aleatoriamente quem será o PLAYER_ONE
+			boolean isFirstPlayer = new Random().nextBoolean();
+			User playerOne = isFirstPlayer ? user : opponent;
+			User playerTwo = isFirstPlayer ? opponent : user;
+
+			// Atualiza os usuários com seus papéis na partida
+			playerOne.setPlayer(isFirstPlayer ? Player.PLAYER_ONE : Player.PLAYER_TWO);
+			playerTwo.setPlayer(isFirstPlayer ? Player.PLAYER_TWO : Player.PLAYER_ONE);
+			userRepository.saveAll(Arrays.asList(playerOne, playerTwo));
+
+			// Cria a nova partida
+			Match newMatch = new Match(UUID.randomUUID(), LocalDateTime.now(),
+
+					playerOne.getId(), playerTwo.getId(),
+
+					s3Service.getPhoto(playerOne.getId()).photo(), s3Service.getPhoto(playerTwo.getId()).photo(),
+
+					0, 0, 0, 0);
+
+			Match savedMatch = matchRepository.save(newMatch);
+
+			// Notifica os clientes sobre a nova partida
+			notifyPlayersOfNewMatch(playerOne, playerTwo, savedMatch);
+
+			return savedMatch;
+		} catch (Exception e) {
+			// Limpa o estado do usuário em caso de erro
+			resetUserState(user);
+			throw new RuntimeException("Error creating match", e);
+		}
+	}
+
+	private void notifyPlayersOfNewMatch(User playerOne, User playerTwo, Match match) throws IOException {
+		WebSocketSession sessionOne = webSocketHandler.getSessionById(playerOne.getId());
+		WebSocketSession sessionTwo = webSocketHandler.getSessionById(playerTwo.getId());
+
+		if (sessionOne != null && sessionTwo != null) {
+			ObjectMapper mapper = new ObjectMapper();
+			String matchInfo = mapper.writeValueAsString(match);
+
+			sessionOne.sendMessage(new TextMessage(matchInfo));
+			sessionTwo.sendMessage(new TextMessage(matchInfo));
+		} else {
+			System.out.println("Unable to find WebSocket sessions for one or both players");
+		}
+	}
+
+	private void resetUserState(User user) {
+		user.setRole(UserRole.OUT_OF_START);
+		user.setPlayer(Player.NO_PLAYER);
+		userRepository.save(user);
+	}
+
+	private User searchPlayer(UUID userId) {
+		// Implementação da lógica para encontrar um oponente
+		// Pode envolver consultas ao banco de dados ou uso de uma fila de espera
+		// Para fins de demonstração, vamos retornar um jogador aleatório
+		List<User> availablePlayers = (List<User>) userRepository.findAllByRole(UserRole.LOOKING_FOR_MATCH);
+		if (!availablePlayers.isEmpty()) {
+			return availablePlayers.get(new Random().nextInt(availablePlayers.size()));
+		}
+		return null;
+	}
+
+	///////////////////////////////////////////////////////////
+
+	public Match getMatch(UUID id) {
+		return matchRepository.findById(id).orElseThrow(() -> new RuntimeException("match not found"));
+	}
+
+	public Match modifyMatchScoreboard(UUID id, RequestMatchScoreboardDTO data) {
+		Optional<Match> requestMatch = this.matchRepository.findById(id);
+		Match match = requestMatch.orElseThrow();
+
+		switch (data.victory()) {
+
+		case MatchScoreboardEnum.PLAYER_ONE: {
+			match.setNumberOfWinsPlayerOne(match.getNumberOfWinsPlayerOne() + 1);
+			match.setNumberOfMatches(match.getNumberOfMatches() + 1);
+
+			addVictoryScore(match.getIdPlayerOne(), match.getIdPlayerTwo());
+
+			break;
+		}
+
+		case MatchScoreboardEnum.PLAYER_TWO: {
+			match.setNumberOfWinsPlayerTwo(match.getNumberOfWinsPlayerTwo() + 1);
+			match.setNumberOfMatches(match.getNumberOfMatches() + 1);
+
+			addVictoryScore(match.getIdPlayerTwo(), match.getIdPlayerOne());
+
+			break;
+		}
+
+		default: {
+			match.setNumberOfDraws(match.getNumberOfDraws() + 1);
+			match.setNumberOfMatches(match.getNumberOfMatches() + 1);
+
+			Optional<User> player = this.userRepository.findById(match.getIdPlayerOne());
+			User playerOne = player.orElseThrow();
+			playerOne.setNumberOfDraws(playerOne.getNumberOfDraws() + 1);
+
+			Optional<User> anotherPlayer = this.userRepository.findById(match.getIdPlayerTwo());
+			User playerTwo = anotherPlayer.orElseThrow();
+			playerTwo.setNumberOfDraws(playerTwo.getNumberOfDraws() + 1);
+
+			this.userRepository.saveAll(Arrays.asList(playerOne, playerTwo));
+		}
+		}
+
+		return this.matchRepository.save(match);
+	}
+
+	private void addVictoryScore(UUID idPlayerOne, UUID idPlayerTwo) {
+		Optional<User> player = this.userRepository.findById(idPlayerOne);
+		User playerOne = player.orElseThrow();
+		playerOne.setNumberOfWins(playerOne.getNumberOfWins() + 1);
+
+		Optional<User> anotherPlayer = this.userRepository.findById(idPlayerTwo);
+		User playerTwo = anotherPlayer.orElseThrow();
+		playerTwo.setNumberOfDefeats(playerTwo.getNumberOfDefeats() + 1);
+
+		this.userRepository.saveAll(Arrays.asList(playerOne, playerTwo));
+	}
+
+	private Board board() {
+
+		Player noField = Player.NO_PLAYER;
+
+		Board newBoard = new Board(null, List.of(noField, noField, noField), List.of(noField, noField, noField),
+				List.of(noField, noField, noField));
+
+		return this.boardRepository.save(newBoard);
+	}
+
+}
